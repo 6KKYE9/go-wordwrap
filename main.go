@@ -80,12 +80,29 @@ func wrapLine(line string, width int) []string {
 }
 
 // wrapText 多行文本整体折行
-func wrapText(text string, width int) string {
+func wrapText(text string, width int, indent, prefix string) string {
 	var b strings.Builder
 	sc := bufio.NewScanner(strings.NewReader(text))
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	n := 0
 	for sc.Scan() {
-		for _, l := range wrapLine(sc.Text(), width) {
+		n++
+		head := prefix
+		if head == "" && indent != "" {
+			head = indent
+		} else if head != "" && indent != "" {
+			head = indent + head
+		}
+		w := width - displayWidth(head)
+		if w < 1 {
+			w = 1
+		}
+		for i, l := range wrapLine(sc.Text(), w) {
+			if i == 0 {
+				b.WriteString(head)
+			} else {
+				b.WriteString(indent)
+			}
 			b.WriteString(l)
 			b.WriteByte('\n')
 		}
@@ -93,10 +110,33 @@ func wrapText(text string, width int) string {
 	return b.String()
 }
 
+// displayWidth 算一段纯 ASCII 前缀的显示宽度（前缀一般不含宽字符）
+func displayWidth(s string) int {
+	return len(s)
+}
+
 func main() {
 	width := flag.Int("w", 80, "折行宽度，中文按两个宽度计")
+	indent := flag.String("i", "", "每行缩进，比如两个空格或制表符")
+	prefix := flag.String("t", "", "行前缀，会放在缩进之后、正文之前")
 	flag.Parse()
-	fmt.Print(wrapText(readStdin(), *width))
+
+	text := readStdin()
+	if len(flag.Args()) > 0 {
+		// 也支持直接把文件当参数读进来折行
+		var b strings.Builder
+		for _, p := range flag.Args() {
+			d, err := os.ReadFile(p)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "读 %s 失败: %v\n", p, err)
+				continue
+			}
+			b.Write(d)
+			b.WriteByte('\n')
+		}
+		text = b.String()
+	}
+	fmt.Print(wrapText(text, *width, *indent, *prefix))
 }
 
 func readStdin() string {

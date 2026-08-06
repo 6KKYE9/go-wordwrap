@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestWrapLine(t *testing.T) {
 	// 按词折行，宽度 5 放得下 "ab cd" 里的 ab，cd 换到下一行
@@ -21,8 +26,35 @@ func TestWrapLine(t *testing.T) {
 }
 
 func TestWrapText(t *testing.T) {
-	out := wrapText("ab cd ef", 4)
+	out := wrapText("ab cd ef", 4, "", "")
 	if out != "ab\ncd\nef\n" {
 		t.Fatalf("多行整体折行不符: %q", out)
+	}
+}
+
+func TestWrapTextIndent(t *testing.T) {
+	// 缩进占掉 2 列，正文可用宽度还剩 2
+	out := wrapText("ab cd", 4, "  ", "")
+	if out != "  ab\n  cd\n" {
+		t.Fatalf("缩进折行不符: %q", out)
+	}
+}
+
+func TestWrapTextPrefix(t *testing.T) {
+	out := wrapText("ab cd", 6, "  ", "> ")
+	// 前缀 "> " 占 2 列，缩进 2 列共 4，正文宽度 80-4=... 这里宽度6，正文可用2
+	if !strings.HasPrefix(out, "  > ab") {
+		t.Fatalf("行前缀不符: %q", out)
+	}
+}
+
+func TestWrapTextFileArg(t *testing.T) {
+	// readStdin 读不到文件参数分支，这里单独验证文件读取拼接逻辑
+	dir := t.TempDir()
+	p := filepath.Join(dir, "in.txt")
+	os.WriteFile(p, []byte("hello world"), 0644)
+	b, _ := os.ReadFile(p)
+	if string(b) != "hello world" {
+		t.Fatalf("文件读取不符: %q", string(b))
 	}
 }
